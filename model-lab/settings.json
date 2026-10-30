@@ -1,0 +1,11 @@
+{
+  "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+  "temperature": 0.2,
+  "top_p": 0.8,
+  "top_k": 20,
+  "min_p": 0,
+  "seed": 42,
+  "max_tokens": 1024,
+  "timeout_ms": 600000,
+  "chat_template_kwargs": {"enable_thinking": false}
+}

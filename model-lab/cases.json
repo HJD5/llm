@@ -1,0 +1,18 @@
+{
+  "description": "Synthetic smoke test authored for this project, not organizer data or native-speaker-validated linguistic benchmark. Frozen before first run. Expected labels never sent to model.",
+  "glossary": [{"ru":"фракция","kk":"фракция","en":"faction","note":"For these test strings retain this game term; inflection allowed."}],
+  "cases": [
+    {"id":"missing","source":"Открыть","target":null,"expected":["untranslated"]},
+    {"id":"russian","source":"Недостаточно денег","target":"Недостаточно денег","expected":["same_as_source"]},
+    {"id":"argument","source":"Привет, {name}!","target":"Сәлем, {player}!","expected":["placeholder_mismatch"]},
+    {"id":"dynamic_name","source":"Отправить сообщение игроку {name}","target":"{name}-ға хабарлама жіберу","context":"name is an arbitrary player name inserted at runtime","expected":["suffix_harmony"]},
+    {"id":"foreign","source":"Сохранить изменения","target":"Save changes","expected":["wrong_language"]},
+    {"id":"icu_broken","source":"{count, plural, one {# машина} other {# машин}}","target":"{count, plural, one {# көлік}}","expected":["plural_mismatch"]},
+    {"id":"glossary","source":"Фракция","target":"Топ","context":"Faction navigation title. Use the supplied glossary.","expected":["glossary_violation"]},
+    {"id":"brand","source":"Grand Mobile","target":"Grand Mobile","context":"Brand name, must stay unchanged","expected":[]},
+    {"id":"number","source":"2026","target":"2026","expected":[]},
+    {"id":"name","source":"Александр","target":"Александр","context":"Character proper name, must stay unchanged","expected":[]},
+    {"id":"correct","source":"Привет, {name}!","target":"Сәлем, {name}!","expected":[]},
+    {"id":"icu_valid","source":"{count, plural, one {# машина} few {# машины} many {# машин} other {# машины}}","target":"{count, plural, other {# көлік}}","expected":[]}
+  ]
+}

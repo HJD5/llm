@@ -1,0 +1,280 @@
+[
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 30.937,
+    "usage": {
+      "completion_tokens": 27,
+      "prompt_tokens": 607,
+      "total_tokens": 634,
+      "prompt_tokens_details": {
+        "cached_tokens": 3
+      }
+    },
+    "timings": {
+      "cache_n": 3,
+      "prompt_n": 604,
+      "prompt_ms": 24961.22,
+      "prompt_per_token_ms": 41.326523178807946,
+      "prompt_per_second": 24.19753521662803,
+      "predicted_n": 27,
+      "predicted_ms": 5846.628,
+      "predicted_per_token_ms": 224.87030769230768,
+      "predicted_per_second": 4.4470077453191825
+    },
+    "output": {
+      "results": [
+        {
+          "id": "delete",
+          "issues": []
+        }
+      ]
+    }
+  },
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 8.851,
+    "usage": {
+      "completion_tokens": 34,
+      "prompt_tokens": 607,
+      "total_tokens": 641,
+      "prompt_tokens_details": {
+        "cached_tokens": 575
+      }
+    },
+    "timings": {
+      "cache_n": 575,
+      "prompt_n": 32,
+      "prompt_ms": 1534.111,
+      "prompt_per_token_ms": 47.94096875,
+      "prompt_per_second": 20.858986083797063,
+      "predicted_n": 34,
+      "predicted_ms": 7309.88,
+      "predicted_per_token_ms": 221.51151515151514,
+      "predicted_per_second": 4.514437993510153
+    },
+    "output": {
+      "results": [
+        {
+          "id": "balance",
+          "issues": [
+            "placeholder_mismatch"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 10.587,
+    "usage": {
+      "completion_tokens": 35,
+      "prompt_tokens": 630,
+      "total_tokens": 665,
+      "prompt_tokens_details": {
+        "cached_tokens": 575
+      }
+    },
+    "timings": {
+      "cache_n": 575,
+      "prompt_n": 55,
+      "prompt_ms": 2757.988,
+      "prompt_per_token_ms": 50.14523636363636,
+      "prompt_per_second": 19.942073714606444,
+      "predicted_n": 35,
+      "predicted_ms": 7821.267,
+      "predicted_per_token_ms": 230.03726470588234,
+      "predicted_per_second": 4.3471217642870394
+    },
+    "output": {
+      "results": [
+        {
+          "id": "recipient",
+          "issues": [
+            "suffix_harmony"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 9.606,
+    "usage": {
+      "completion_tokens": 34,
+      "prompt_tokens": 614,
+      "total_tokens": 648,
+      "prompt_tokens_details": {
+        "cached_tokens": 575
+      }
+    },
+    "timings": {
+      "cache_n": 575,
+      "prompt_n": 39,
+      "prompt_ms": 2147.294,
+      "prompt_per_token_ms": 55.05882051282051,
+      "prompt_per_second": 18.162394157483792,
+      "predicted_n": 34,
+      "predicted_ms": 7449.676,
+      "predicted_per_token_ms": 225.7477575757576,
+      "predicted_per_second": 4.429722849691718
+    },
+    "output": {
+      "results": [
+        {
+          "id": "currency",
+          "issues": [
+            "same_as_source"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 8.63,
+    "usage": {
+      "completion_tokens": 27,
+      "prompt_tokens": 628,
+      "total_tokens": 655,
+      "prompt_tokens_details": {
+        "cached_tokens": 575
+      }
+    },
+    "timings": {
+      "cache_n": 575,
+      "prompt_n": 53,
+      "prompt_ms": 2920.312,
+      "prompt_per_token_ms": 55.10022641509434,
+      "prompt_per_second": 18.14874575045406,
+      "predicted_n": 27,
+      "predicted_ms": 5701.525,
+      "predicted_per_token_ms": 219.28942307692307,
+      "predicted_per_second": 4.560183459688417
+    },
+    "output": {
+      "results": [
+        {
+          "id": "balance_ok",
+          "issues": []
+        }
+      ]
+    }
+  },
+  {
+    "profile": "profile",
+    "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+    "settings": {
+      "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+      "temperature": 0.2,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "seed": 42,
+      "max_tokens": 1024,
+      "timeout_ms": 600000,
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      }
+    },
+    "elapsed_seconds": 10.123,
+    "usage": {
+      "completion_tokens": 35,
+      "prompt_tokens": 631,
+      "total_tokens": 666,
+      "prompt_tokens_details": {
+        "cached_tokens": 575
+      }
+    },
+    "timings": {
+      "cache_n": 575,
+      "prompt_n": 56,
+      "prompt_ms": 2706.164,
+      "prompt_per_token_ms": 48.324357142857146,
+      "prompt_per_second": 20.69349825066034,
+      "predicted_n": 35,
+      "predicted_ms": 7410.498,
+      "predicted_per_token_ms": 217.95582352941176,
+      "predicted_per_second": 4.588085712997966
+    },
+    "output": {
+      "results": [
+        {
+          "id": "plural_ok",
+          "issues": [
+            "plural_mismatch"
+          ]
+        }
+      ]
+    }
+  }
+]

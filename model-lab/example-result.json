@@ -1,0 +1,61 @@
+{
+  "profile": "profile",
+  "batch_size": 1,
+  "parts": [
+    {
+      "profile": "profile",
+      "profile_sha256": "c9ec52314afc60cd539dcadc9b19d1419d68b139bd459373ea04b77996188d62",
+      "settings": {
+        "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+        "temperature": 0.2,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0,
+        "seed": 42,
+        "max_tokens": 1024,
+        "timeout_ms": 600000,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "elapsed_seconds": 7.67,
+      "usage": {
+        "completion_tokens": 27,
+        "prompt_tokens": 639,
+        "total_tokens": 666,
+        "prompt_tokens_details": {
+          "cached_tokens": 575
+        }
+      },
+      "timings": {
+        "cache_n": 575,
+        "prompt_n": 64,
+        "prompt_ms": 2000.219,
+        "prompt_per_token_ms": 31.253421875,
+        "prompt_per_second": 31.99649638364599,
+        "predicted_n": 27,
+        "predicted_ms": 5617.475,
+        "predicted_per_token_ms": 216.0567307692308,
+        "predicted_per_second": 4.628414011633341
+      },
+      "output": {
+        "results": [
+          {
+            "id": "message_player",
+            "issues": []
+          }
+        ]
+      }
+    }
+  ],
+  "output": {
+    "results": [
+      {
+        "id": "message_player",
+        "issues": []
+      }
+    ]
+  },
+  "reviewed_by_human": false,
+  "notice": "Model proposals only. No translations applied; native-speaker review required."
+}

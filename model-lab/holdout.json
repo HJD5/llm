@@ -1,0 +1,12 @@
+{
+  "description":"Second synthetic set, frozen before v2 results. Tests only 3 positive categories and 3 controls, not independent human linguistic evaluation. Both profiles run one record per request. Development choices were informed by first set.",
+  "glossary": [],
+  "cases":[
+    {"id":"delete","source":"Удалить персонажа","target":"Удалить персонажа","expected":["same_as_source"]},
+    {"id":"balance","source":"Баланс: {amount}","target":"Баланс: {sum}","expected":["placeholder_mismatch"]},
+    {"id":"recipient","source":"Подарок для игрока {nickname}","target":"{nickname}-ге сыйлық","context":"nickname — произвольное имя игрока, подставляется во время игры.","expected":["suffix_harmony"]},
+    {"id":"currency","source":"GrandCoins","target":"GrandCoins","context":"Название игровой валюты; сохраняется без перевода.","expected":[]},
+    {"id":"balance_ok","source":"Баланс: {amount}","target":"Баланс: {amount}","context":"Баланс — допустимый термин на обоих языках.","expected":[]},
+    {"id":"plural_ok","source":"{n, plural, one {# день} few {# дня} many {# дней} other {# дня}}","target":"{n, plural, other {# күн}}","expected":[]}
+  ]
+}

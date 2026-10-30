@@ -1,0 +1,465 @@
+{
+  "created_at": "2026-10-30T10:47:51.330Z",
+  "description": "Synthetic smoke test authored for this project, not organizer data or native-speaker-validated linguistic benchmark. Frozen before first run. Expected labels never sent to model.",
+  "dataset_sha256": "3010a1d7df7c98585817a3f2fde58d34998eb62d387b04f82edc13c3f91421fc",
+  "runs": [
+    {
+      "profile": "baseline",
+      "profile_sha256": "0e591591fb4dcc1294286ca9ad7953df881bc53a4cec7e1d807bdb36e4035410",
+      "settings": {
+        "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+        "temperature": 0.2,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0,
+        "seed": 42,
+        "max_tokens": 1024,
+        "timeout_ms": 600000,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "elapsed_seconds": 86.295,
+      "usage": {
+        "completion_tokens": 257,
+        "prompt_tokens": 509,
+        "total_tokens": 766,
+        "prompt_tokens_details": {
+          "cached_tokens": 1
+        }
+      },
+      "timings": {
+        "cache_n": 1,
+        "prompt_n": 508,
+        "prompt_ms": 16321.076,
+        "prompt_per_token_ms": 32.12810236220472,
+        "prompt_per_second": 31.125398840125495,
+        "predicted_n": 257,
+        "predicted_ms": 69649.065,
+        "predicted_per_token_ms": 272.06666015625,
+        "predicted_per_second": 3.675569801260074
+      },
+      "output": {
+        "results": [
+          {
+            "id": "missing",
+            "issues": [
+              "untranslated"
+            ]
+          },
+          {
+            "id": "russian",
+            "issues": []
+          },
+          {
+            "id": "argument",
+            "issues": []
+          },
+          {
+            "id": "dynamic_name",
+            "issues": []
+          },
+          {
+            "id": "foreign",
+            "issues": [
+              "wrong_language"
+            ]
+          },
+          {
+            "id": "icu_broken",
+            "issues": [
+              "plural_mismatch"
+            ]
+          },
+          {
+            "id": "glossary",
+            "issues": [
+              "glossary_violation"
+            ]
+          },
+          {
+            "id": "brand",
+            "issues": []
+          },
+          {
+            "id": "number",
+            "issues": []
+          },
+          {
+            "id": "name",
+            "issues": []
+          },
+          {
+            "id": "correct",
+            "issues": []
+          },
+          {
+            "id": "icu_valid",
+            "issues": [
+              "suffix_harmony"
+            ]
+          }
+        ]
+      },
+      "score": {
+        "tp": 4,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.8,
+        "recall": 0.5714285714285714,
+        "exact": 8,
+        "total": 12,
+        "details": [
+          {
+            "id": "missing",
+            "expected": [
+              "untranslated"
+            ],
+            "predicted": [
+              "untranslated"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "russian",
+            "expected": [
+              "same_as_source"
+            ],
+            "predicted": [],
+            "extra": [],
+            "missed": [
+              "same_as_source"
+            ]
+          },
+          {
+            "id": "argument",
+            "expected": [
+              "placeholder_mismatch"
+            ],
+            "predicted": [],
+            "extra": [],
+            "missed": [
+              "placeholder_mismatch"
+            ]
+          },
+          {
+            "id": "dynamic_name",
+            "expected": [
+              "suffix_harmony"
+            ],
+            "predicted": [],
+            "extra": [],
+            "missed": [
+              "suffix_harmony"
+            ]
+          },
+          {
+            "id": "foreign",
+            "expected": [
+              "wrong_language"
+            ],
+            "predicted": [
+              "wrong_language"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "icu_broken",
+            "expected": [
+              "plural_mismatch"
+            ],
+            "predicted": [
+              "plural_mismatch"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "glossary",
+            "expected": [
+              "glossary_violation"
+            ],
+            "predicted": [
+              "glossary_violation"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "brand",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "number",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "name",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "correct",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "icu_valid",
+            "expected": [],
+            "predicted": [
+              "suffix_harmony"
+            ],
+            "extra": [
+              "suffix_harmony"
+            ],
+            "missed": []
+          }
+        ]
+      }
+    },
+    {
+      "profile": "profile",
+      "profile_sha256": "05ad10dd933d0b0df0fec59f2c6d7efd18d3715a0573651fe2fa5312dea4b839",
+      "settings": {
+        "endpoint": "http://127.0.0.1:8088/v1/chat/completions",
+        "temperature": 0.2,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0,
+        "seed": 42,
+        "max_tokens": 1024,
+        "timeout_ms": 600000,
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "elapsed_seconds": 127.658,
+      "usage": {
+        "completion_tokens": 266,
+        "prompt_tokens": 873,
+        "total_tokens": 1139,
+        "prompt_tokens_details": {
+          "cached_tokens": 3
+        }
+      },
+      "timings": {
+        "cache_n": 3,
+        "prompt_n": 870,
+        "prompt_ms": 39326.323,
+        "prompt_per_token_ms": 45.20267011494253,
+        "prompt_per_second": 22.122586950221613,
+        "predicted_n": 266,
+        "predicted_ms": 88116.1,
+        "predicted_per_token_ms": 332.5135849056604,
+        "predicted_per_second": 3.007395924240859
+      },
+      "output": {
+        "results": [
+          {
+            "id": "missing",
+            "issues": [
+              "untranslated"
+            ]
+          },
+          {
+            "id": "russian",
+            "issues": []
+          },
+          {
+            "id": "argument",
+            "issues": [
+              "glossary_violation"
+            ]
+          },
+          {
+            "id": "dynamic_name",
+            "issues": []
+          },
+          {
+            "id": "foreign",
+            "issues": [
+              "wrong_language"
+            ]
+          },
+          {
+            "id": "icu_broken",
+            "issues": [
+              "plural_mismatch"
+            ]
+          },
+          {
+            "id": "glossary",
+            "issues": [
+              "glossary_violation"
+            ]
+          },
+          {
+            "id": "brand",
+            "issues": []
+          },
+          {
+            "id": "number",
+            "issues": []
+          },
+          {
+            "id": "name",
+            "issues": []
+          },
+          {
+            "id": "correct",
+            "issues": []
+          },
+          {
+            "id": "icu_valid",
+            "issues": [
+              "plural_mismatch"
+            ]
+          }
+        ]
+      },
+      "score": {
+        "tp": 4,
+        "fp": 2,
+        "fn": 3,
+        "precision": 0.6666666666666666,
+        "recall": 0.5714285714285714,
+        "exact": 8,
+        "total": 12,
+        "details": [
+          {
+            "id": "missing",
+            "expected": [
+              "untranslated"
+            ],
+            "predicted": [
+              "untranslated"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "russian",
+            "expected": [
+              "same_as_source"
+            ],
+            "predicted": [],
+            "extra": [],
+            "missed": [
+              "same_as_source"
+            ]
+          },
+          {
+            "id": "argument",
+            "expected": [
+              "placeholder_mismatch"
+            ],
+            "predicted": [
+              "glossary_violation"
+            ],
+            "extra": [
+              "glossary_violation"
+            ],
+            "missed": [
+              "placeholder_mismatch"
+            ]
+          },
+          {
+            "id": "dynamic_name",
+            "expected": [
+              "suffix_harmony"
+            ],
+            "predicted": [],
+            "extra": [],
+            "missed": [
+              "suffix_harmony"
+            ]
+          },
+          {
+            "id": "foreign",
+            "expected": [
+              "wrong_language"
+            ],
+            "predicted": [
+              "wrong_language"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "icu_broken",
+            "expected": [
+              "plural_mismatch"
+            ],
+            "predicted": [
+              "plural_mismatch"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "glossary",
+            "expected": [
+              "glossary_violation"
+            ],
+            "predicted": [
+              "glossary_violation"
+            ],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "brand",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "number",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "name",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "correct",
+            "expected": [],
+            "predicted": [],
+            "extra": [],
+            "missed": []
+          },
+          {
+            "id": "icu_valid",
+            "expected": [],
+            "predicted": [
+              "plural_mismatch"
+            ],
+            "extra": [
+              "plural_mismatch"
+            ],
+            "missed": []
+          }
+        ]
+      }
+    }
+  ]
+}

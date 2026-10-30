@@ -1,0 +1,8 @@
+{
+  "name": "qazaq-locqa-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test test/*.test.mjs"},
+  "dependencies": {"@formatjs/icu-messageformat-parser": "^2.11.4", "jsonc-parser": "^3.3.1", "csv-parse": "^6.1.0"}
+}

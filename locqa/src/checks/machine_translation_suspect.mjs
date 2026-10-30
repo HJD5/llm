@@ -1,0 +1,2 @@
+export default {id:'machine_translation_suspect',model:true,
+  prompt:'Check semantic equivalence and clear grammatical mistranslation ONLY. Detect added or missing important meaning, wrong action/object/number/negation, or demonstrably broken grammar. Natural paraphrases and concise UI are allowed. Do not assess identical-to-source, UI length, placeholder syntax or suffix harmony. A stylistic preference is not an error. English is supporting context, not ground truth.'};

@@ -1,0 +1,2 @@
+export default {id:'orthography',model:true,
+  prompt:'Check concrete Kazakh spelling mistakes ONLY. Name the exact misspelled word and explain the spelling issue. Do not assess meaning, style, length or endings after runtime placeholders. Absence of Kazakh-specific letters is not evidence. Do not invent dictionary rules. Names, brands and slang may be valid; choose uncertain if lexical knowledge is insufficient.'};
