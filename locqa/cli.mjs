@@ -6,15 +6,18 @@ import {loadArb,makeRecords} from './src/arb.mjs';
 import {checkRecords,modules} from './src/engine.mjs';
 import {QwenClient} from './src/qwen.mjs';
 import {htmlReport} from './src/report.mjs';
+import {withNeighborContext} from './src/neighbor-context.mjs';
 const help=`node locqa/cli.mjs check --source file.arb --target file.arb --out report.json
   --reference intl_en.arb --glossary glossary.csv --config config.json
   --checks comma,separated,ids --keys key1,key2
-  --llm --max-llm-calls 12 --cache-dir locqa/private-results/cache
+  --llm --max-llm-calls 12 --cache-dir locqa/private-results/cache --context-neighbors
 Default: 8 code modules, 3 Qwen modules reported deferred. No translations are modified.
+Glossary review: node locqa/cli.mjs review-glossary --help
 Checks: ${modules.map(m=>m.id).join(', ')}`;
 async function main(){
+  if(process.argv[2]==='review-glossary'){const {main:review}=await import('./review-glossary.mjs');await review(process.argv.slice(3));return;}
   const names=['source','target','out','reference','glossary','config','checks','keys','max-llm-calls','cache-dir'];
-  const {values:v,positionals}=parseArgs({options:{...Object.fromEntries(names.map(n=>[n,{type:'string'}])),llm:{type:'boolean'},help:{type:'boolean'}},allowPositionals:true});
+  const {values:v,positionals}=parseArgs({options:{...Object.fromEntries(names.map(n=>[n,{type:'string'}])),llm:{type:'boolean'},help:{type:'boolean'},'context-neighbors':{type:'boolean'}},allowPositionals:true});
   if(v.help){console.log(help);return;}
   if(positionals.length!==1||positionals[0]!=='check'||!v.source||!v.target||!v.out)throw Error(help);
   const output=path.resolve(v.out),html=output.replace(/\.json$/i,'')+'.html';
@@ -32,6 +35,7 @@ async function main(){
   const budget=Number(v['max-llm-calls']??12);
   if(!Number.isSafeInteger(budget)||budget<0||budget>100000)throw Error('Invalid max-llm-calls');
   let records=makeRecords(source,target,reference);
+  if(v['context-neighbors'])records=withNeighborContext(records);
   if(v.keys){const requested=new Set(v.keys.split(','));const unknown=[...requested].filter(k=>!records.some(r=>r.key===k));if(unknown.length)throw Error('Unknown keys: '+unknown.join(','));records=records.filter(r=>requested.has(r.key));}
   const cacheDir=path.resolve(v['cache-dir']??'locqa/private-results/cache');
   const client=v.llm?new QwenClient({endpoint:config.endpoint??'http://127.0.0.1:8088/v1/chat/completions',modelRevision:config.model_revision??'Qwen3-8B-Q4_K_M:d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785',cacheDir,maxCalls:budget,maxRetries:config.llm_max_retries??1,maxTokens:config.llm_max_tokens??768,timeoutMs:config.llm_timeout_ms??240000}):null;

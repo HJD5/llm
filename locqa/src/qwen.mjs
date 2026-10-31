@@ -3,6 +3,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {validateSuggestion,norm} from './message.mjs';
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
+const dottedAbbreviation=text=>/^(?:\p{L}{1,3}\.){1,4}$/u.test(text.trim());
 export const responseSchema={type:'object',additionalProperties:false,properties:{source_quote:{type:'string'},target_quote:{type:'string'},reason:{type:'string'},verdict:{enum:['clear','error','uncertain']},suggestion:{anyOf:[{type:'string'},{type:'null'}]}},required:['source_quote','target_quote','reason','verdict','suggestion']};
 export function validateReview(value,row,locale,module){
   const fields=[...responseSchema.required,'detected_language','language_evidence'];
@@ -18,6 +19,9 @@ export function validateReview(value,row,locale,module){
   if(value.verdict==='error'&&module?.id==='wrong_language'){
     if(!/^[a-z]{2,3}$/.test(value.detected_language??'')||['kk','kaz','und'].includes(value.detected_language)||!value.language_evidence?.trim())return abstain('missing_foreign_language_evidence');
     if(/unnatural|awkward|stylistic|word order|неестествен|стилист|порядок слов|табиғи емес/iu.test(value.language_evidence))return abstain('style_is_not_language_evidence');
+    if(dottedAbbreviation(value.target_quote))return abstain('abbreviation_is_not_language_evidence');
+    const targetTokens=(value.target_quote.match(/\p{L}{3,}/gu)??[]).map(x=>x.toLowerCase());
+    if(!targetTokens.some(x=>value.language_evidence.toLowerCase().includes(x)))return abstain('language_evidence_does_not_describe_target');
   }
   // Narrow counterexample guard, not a language classifier or a dictionary.
   if(value.verdict==='error'&&['wrong_language','orthography'].includes(module?.id)){
@@ -37,6 +41,7 @@ export function modelEligible(row,ctx,module){
   if(norm(row.source)===norm(row.target))return 'same_as_source_handled_by_code';
   if(ctx.src.error||ctx.tgt.error)return 'invalid_message_structure';
   if(JSON.stringify(ctx.src.args)!==JSON.stringify(ctx.tgt.args)||JSON.stringify(ctx.src.printf)!==JSON.stringify(ctx.tgt.printf))return 'placeholder_error_first';
+  if(dottedAbbreviation(row.source)&&dottedAbbreviation(row.target))return 'ambiguous_short_abbreviation';
   // Short uppercase UI labels are ambiguous without domain review. Abstain,
   // rather than spending the model budget interpreting unit labels as sounds.
   if(/^[\p{Lu}]{1,3}\.?$/u.test(row.source.trim())&&/^[\p{Lu}]{1,4}\.?$/u.test(row.target.trim()))return 'ambiguous_short_abbreviation';
@@ -53,6 +58,52 @@ export class QwenClient{
     this.calls=0;this.cacheHits=0;
     if(!Number.isInteger(maxRetries)||maxRetries<0||maxRetries>2||!Number.isInteger(maxTokens)||maxTokens<128||maxTokens>4096||!Number.isInteger(timeoutMs)||timeoutMs<1)throw Error('Invalid Qwen retry/token/timeout settings');
     Object.assign(this,{maxRetries,maxTokens,timeoutMs});
+  }
+  async localJson(route,body,signal){
+    const url=new URL(this.endpoint);url.pathname=route;url.search='';url.hash='';
+    const response=await this.request(url.href,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(this.timeoutMs)]):AbortSignal.timeout(this.timeoutMs)});
+    if(!response.ok)throw Error(`Qwen ${route}: HTTP ${response.status}`);
+    return response.json();
+  }
+  async countChatTokens(body,signal){
+    const template=await this.localJson('/apply-template',{messages:body.messages,chat_template_kwargs:body.chat_template_kwargs,add_generation_prompt:true},signal);
+    if(typeof template.prompt!=='string')throw Error('Qwen /apply-template did not return a prompt');
+    const result=await this.localJson('/tokenize',{content:template.prompt,add_special:false},signal);
+    if(!Array.isArray(result.tokens))throw Error('Qwen /tokenize did not return tokens');
+    return result.tokens.length;
+  }
+  // Shared local transport, budgets and cache for structured tasks such as glossary review.
+  // Retries keep the exact same prompt/output budget: never expand beyond the context limit.
+  async peekStructured(body,validate,{countHit=true}={}){
+    const key=hash({task:'structured-v1',modelRevision:this.modelRevision,endpoint:this.endpoint,body});
+    try{
+      const cached=JSON.parse(await fs.readFile(path.join(this.cacheDir,key+'.json'),'utf8'));
+      if(cached.raw.choices?.[0]?.finish_reason!=='stop')return null;
+      const review=validate(JSON.parse(cached.raw.choices[0].message.content));
+      if(countHit)this.cacheHits++;
+      return {...cached,review,cached:true};
+    }catch{return null;}
+  }
+  async structured(body,validate,{signal}={}){
+    const key=hash({task:'structured-v1',modelRevision:this.modelRevision,endpoint:this.endpoint,body});
+    const file=path.join(this.cacheDir,key+'.json');
+    const cached=await this.peekStructured(body,validate);if(cached)return cached;
+    const start=Date.now(),attempts=[];
+    for(let attempt=0;attempt<=this.maxRetries;attempt++){
+      signal?.throwIfAborted();
+      if(this.calls>=this.maxCalls){if(!attempts.length)return {deferred:true};break;}
+      this.calls++;let raw;
+      try{
+        const response=await this.request(this.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(this.timeoutMs)]):AbortSignal.timeout(this.timeoutMs)});
+        if(!response.ok)throw Error(`Qwen HTTP ${response.status}: ${(await response.text()).slice(0,200)}`);
+        raw=await response.json();
+        if(raw.choices?.[0]?.finish_reason!=='stop')throw Error('Incomplete model output: '+raw.choices?.[0]?.finish_reason);
+        const review=validate(JSON.parse(raw.choices[0].message.content));
+        const result={review,raw,attempts:[...attempts,{status:'ok'}],request_hash:key,model_revision:this.modelRevision,elapsed_seconds:(Date.now()-start)/1000,cached:false};
+        await fs.mkdir(this.cacheDir,{recursive:true});await fs.writeFile(file,JSON.stringify(result,null,2));return result;
+      }catch(e){attempts.push({status:'failed',error:e.message,raw});}
+    }
+    const error=Error(`Qwen failed after ${attempts.length} attempt(s): ${attempts.at(-1)?.error}`);error.attempts=attempts;throw error;
   }
   async check(module,row,locale){
     const schema=structuredClone(responseSchema);

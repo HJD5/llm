@@ -8,3 +8,4 @@ node_modules/
 __pycache__/
 locqa/private-results/
 platform/private-data/
+submission/

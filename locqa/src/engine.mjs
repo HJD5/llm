@@ -16,7 +16,7 @@ import {approvedEntity} from './entities.mjs';
 import {approvedTerms} from './glossary.mjs';
 export const modules=[untranslated,sameAsSource,placeholders,plurals,glossary,length,suffix,inconsistent,semantic,orthography,language];
 export async function checkRecords(records,{config={},terms=[],checks=modules.map(m=>m.id),client=null,onProgress=()=>{},onEvent=()=>{},checkpoint=async()=>{}}={}){
-  terms=approvedTerms(terms);
+  terms=approvedTerms(terms,{includeMachineValidated:config.include_machine_validated_glossary===true});
   config={locale:'kk',allow_unchanged:[],max_chars:{},...config};
   if(config.locale!=='kk')throw Error('Language modules currently support kk only');
   for(const id of checks)if(!modules.some(m=>m.id===id))throw Error(`Unknown check ${id}`);
@@ -53,7 +53,9 @@ export async function checkRecords(records,{config={},terms=[],checks=modules.ma
       if(!client){stat.deferred++;continue;}
       try{
         onProgress(`${module.id}: ${row.key}`);
-        const response=await client.check(module,row,config.locale);
+        const relevantTerms=terms.filter(t=>(!t.key||t.key===row.key)&&[t.ru,...(t.source_variants??[])].some(s=>norm(row.source).includes(norm(s)))).slice(0,12);
+        const modelRow=relevantTerms.length?{...row,context:{...row.context,terminology:relevantTerms.map(t=>({ru:t.ru,kk:t.kk,variants:t.variants??[],key:t.key??'',verification:t.verification??t.status}))}}:row;
+        const response=await client.check(module,modelRow,config.locale);
         if(response.deferred){stat.deferred++;continue;}
         stat.assessed++;
         report.model_reviews.push({key:row.key,check:module.id,...response});

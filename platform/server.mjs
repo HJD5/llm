@@ -13,6 +13,8 @@ import {recommend,validateCorrection,exportApproved} from './recommendations.mjs
 import {entityTypes,entityFingerprint,entityHint} from '../locqa/src/entities.mjs';
 import {readGlossary,approvedTerms} from '../locqa/src/glossary.mjs';
 import {classifyEntity} from './entity-review.mjs';
+import {GlossaryReviewStore,exportGlossary} from './glossary-review.mjs';
+import {glossaryFixedArb,glossaryFixPlan} from './glossary-fixed.mjs';
 const require=createRequire(new URL('../locqa/package.json',import.meta.url));
 const {parse:csv}=require('csv-parse/sync');
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
@@ -22,6 +24,7 @@ export const parseGlossary=readGlossary;
 const issueId=i=>createHash('sha256').update(i.key+'\0'+i.issue_type).digest('hex').slice(0,24);
 export async function createPlatform({dataDir=path.join(here,'private-data'),seed=true,recommendationFn=recommend,entityClassifier=classifyEntity}={}){
   await fs.mkdir(path.join(dataDir,'datasets'),{recursive:true});await fs.mkdir(path.join(dataDir,'runs'),{recursive:true});
+  const glossaryReview=await new GlossaryReviewStore(path.join(dataDir,'glossary-review.json')).load();
   const csrf=randomBytes(24).toString('hex'),datasets=new Map(),jobs=new Map(),streams=new Set(),writes=new Map();let active=null,starting=false;
   let recommending=false;const recommendationController=new AbortController();
   const exceptionsFile=path.join(dataDir,'entity-exceptions.json');
@@ -88,6 +91,17 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
     try{
       if(req.method==='GET'&&url.pathname==='/api/bootstrap'){json(200,{csrf,datasets:[...datasets.values()].map(dsMeta),runs:[...jobs.values()].map(jobMeta).sort((a,b)=>b.startedAt.localeCompare(a.startedAt)),modules:modules.map(m=>({id:m.id,name:moduleNames[m.id],model:!!m.model})),active:active?.id??null});return;}
       if(req.method==='GET'&&url.pathname==='/api/model'){json(200,await modelStatus());return;}
+      if(req.method==='GET'&&url.pathname==='/api/glossary'){json(200,glossaryReview.view());return;}
+      if(req.method==='GET'&&['/api/glossary/fixed','/api/glossary/fixed-plan'].includes(url.pathname)){
+        const d=datasets.get(url.searchParams.get('datasetId'));if(!d)throw Error('Выберите набор ARB');
+        if(url.pathname.endsWith('fixed-plan')){json(200,glossaryFixPlan(d,glossaryReview.state.entries));return;}
+        const result=glossaryFixedArb(d,glossaryReview.state.entries);
+        res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="intl_kk_fixed.arb"','Cache-Control':'no-store'});res.end(result.text);return;
+      }
+      if(req.method==='GET'&&url.pathname==='/api/glossary/export'){
+        const text=exportGlossary(glossaryReview.state.entries);
+        res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="glossary.csv"','Cache-Control':'no-store'});res.end(text);return;
+      }
       if(req.method==='GET'&&url.pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write(': connected\n\n');streams.add(res);const timer=setInterval(()=>res.write(': heartbeat\n\n'),15000);req.on('close',()=>{clearInterval(timer);streams.delete(res);});return;}
       if(req.method==='GET'&&parts[0]==='api'&&parts[1]==='datasets'&&parts[3]==='rows'){
         const d=datasets.get(parts[2]);if(!d){json(404,{error:'Набор не найден'});return;}
@@ -118,6 +132,11 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
         if(!(req.headers['content-type']??'').startsWith('application/json')){json(415,{error:'Ожидается JSON'});return;}
         let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>12*1024*1024){json(413,{error:'Максимальный размер загрузки 12 МБ'});return;}chunks.push(chunk);}
         const body=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');
+        if(url.pathname==='/api/glossary/import'){
+          if(typeof body.csv!=='string')throw Error('Нужен CSV проверки глоссария');
+          json(200,await glossaryReview.import(body.csv,body.revision??null));return;
+        }
+        if(url.pathname==='/api/glossary/decisions'){json(200,await glossaryReview.decide(body));return;}
         if(url.pathname==='/api/datasets'){
           const id=randomUUID(),data={name:String(body.name??'Новый набор'),source:body.source,target:body.target,reference:body.reference??'',glossary:parseGlossary(body.glossary??''),createdAt:new Date().toISOString()};
           const d=addDataset(id,data);await persist(path.join(dataDir,'datasets',id+'.json'),data);json(201,dsMeta(d));return;
@@ -210,14 +229,14 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
         }
         json(404,{error:'Маршрут не найден'});return;
       }
-      if(req.method==='GET'&&['/','/index.html','/app.js','/style.css'].includes(url.pathname)){
+      if(req.method==='GET'&&['/','/index.html','/app.js','/glossary.js','/style.css'].includes(url.pathname)){
         const name=url.pathname==='/'?'index.html':url.pathname.slice(1),data=await fs.readFile(path.join(here,'public',name));
         res.writeHead(200,{'Content-Type':name.endsWith('.js')?'text/javascript; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"});res.end(data);return;
       }
       json(404,{error:'Не найдено'});
     }catch(e){if(!res.headersSent)json(400,{error:e.message});else res.end();}
   });
-  async function close(){recommendationController.abort();if(active){const j=jobs.get(active.id);j.status='interrupted';j.finishedAt=new Date().toISOString();await active.worker.terminate();await saveJob(j);active=null;}for(const s of streams)s.end();await Promise.allSettled([...writes.values()]);await new Promise(r=>server.close(r));}
+  async function close(){recommendationController.abort();if(active){const j=jobs.get(active.id);j.status='interrupted';j.finishedAt=new Date().toISOString();await active.worker.terminate();await saveJob(j);active=null;}for(const s of streams)s.end();await glossaryReview.flush();await Promise.allSettled([...writes.values()]);await new Promise(r=>server.close(r));}
   return {server,close};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

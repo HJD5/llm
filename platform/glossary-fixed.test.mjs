@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {parseArb,makeRecords} from '../locqa/src/arb.mjs';
+import {prepareReview,parseDraft,reviewCsv} from '../locqa/src/glossary-review.mjs';
+import {glossaryCsv} from '../locqa/src/glossary.mjs';
+import {GlossaryReviewStore} from './glossary-review.mjs';
+import {glossaryFixedArb,glossaryFixPlan} from './glossary-fixed.mjs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+test('fixed ARB applies only approved exact-context decisions, preserves metadata and blocks stale contexts',async()=>{
+ const source=parseArb('{"a":"Отмена","@a":{"description":"Cancel button"}}'),text='{"a":"БАСТАУ","@a":{"description":"Keep"}}',target=parseArb(text);
+ const d={sourceHash:source.sha256,targetHash:target.sha256,target:text,rows:makeRecords(source,target)};
+ const draft=parseDraft(glossaryCsv([{ru:'Отмена',kk:'БАСТАУ',en:'Cancel',key:'a',related_keys:'a',status:'proposed'}]));
+ const review={columns:draft.columns,rows:prepareReview(draft,d.rows)};
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'locqa-fixed-'));
+ const store=await new GlossaryReviewStore(path.join(dir,'review.json')).load();let v=await store.import(reviewCsv(review),null);
+ assert.throws(()=>glossaryFixedArb(d,v.entries),/Нет одобренных/);assert.equal(glossaryFixPlan(d,v.entries).pending_terms,1);
+ v=await store.decide({revision:v.revision,entries:[{id:v.entries[0].id,translation:'БОЛДЫРМАУ',key:'a'}],status:'approved',reviewer:'Test reviewer',confirm:true});
+ const result=glossaryFixedArb(d,v.entries);const json=JSON.parse(result.text);assert.equal(json.a,'БОЛДЫРМАУ');assert.equal(json['@a'].reviewed_by_human,true);assert.equal(json['@a'].description,'Keep');assert.equal(d.target,text);
+ assert.equal(result.plan.approved_changes,1);
+ assert.throws(()=>glossaryFixedArb({...d,rows:[{...d.rows[0],target:'Changed'}]},v.entries),/контекст/);
+ assert.throws(()=>glossaryFixedArb({...d,rows:[{...d.rows[0],source:'Другое'}]},v.entries),/контекст/);
+});
