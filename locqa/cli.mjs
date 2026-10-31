@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
-import {parse as parseCsv} from 'csv-parse/sync';
+import {readGlossary} from './src/glossary.mjs';
 import {loadArb,makeRecords} from './src/arb.mjs';
 import {checkRecords,modules} from './src/engine.mjs';
 import {QwenClient} from './src/qwen.mjs';
@@ -25,14 +25,7 @@ async function main(){
   let terms=[];
   if(v.glossary){
     const text=await fs.readFile(v.glossary,'utf8');
-    terms=v.glossary.endsWith('.json')?JSON.parse(text):parseCsv(text,{columns:true,bom:true,skip_empty_lines:true});
-    if(!Array.isArray(terms))throw Error('Glossary must contain an array or CSV rows');
-    terms=terms.map(t=>{
-      if(typeof t.ru!=='string'||!t.ru.trim()||typeof t.kk!=='string'||!t.kk.trim())throw Error('Glossary rows require nonempty ru and kk');
-      const variants=Array.isArray(t.variants)?t.variants:typeof t.variants==='string'?t.variants.split('|').filter(Boolean):[];
-      if(variants.some(x=>typeof x!=='string'))throw Error('Invalid glossary variants');
-      return {...t,variants};
-    });
+    terms=readGlossary(text);
   }
   if(config.allow_unchanged&&(!Array.isArray(config.allow_unchanged)||config.allow_unchanged.some(x=>typeof x!=='string')))throw Error('allow_unchanged must be an array of strings');
   if(config.max_chars&&(typeof config.max_chars!=='object'||Array.isArray(config.max_chars)||Object.values(config.max_chars).some(x=>!Number.isInteger(x)||x<0)))throw Error('max_chars must map keys to nonnegative integer limits');
@@ -41,7 +34,7 @@ async function main(){
   let records=makeRecords(source,target,reference);
   if(v.keys){const requested=new Set(v.keys.split(','));const unknown=[...requested].filter(k=>!records.some(r=>r.key===k));if(unknown.length)throw Error('Unknown keys: '+unknown.join(','));records=records.filter(r=>requested.has(r.key));}
   const cacheDir=path.resolve(v['cache-dir']??'locqa/private-results/cache');
-  const client=v.llm?new QwenClient({endpoint:config.endpoint??'http://127.0.0.1:8088/v1/chat/completions',modelRevision:config.model_revision??'Qwen3-8B-Q4_K_M:d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785',cacheDir,maxCalls:budget}):null;
+  const client=v.llm?new QwenClient({endpoint:config.endpoint??'http://127.0.0.1:8088/v1/chat/completions',modelRevision:config.model_revision??'Qwen3-8B-Q4_K_M:d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785',cacheDir,maxCalls:budget,maxRetries:config.llm_max_retries??1,maxTokens:config.llm_max_tokens??768,timeoutMs:config.llm_timeout_ms??240000}):null;
   const start=Date.now();
   const provenance={created_at:new Date().toISOString(),source:{file:v.source,sha256:source.sha256},target:{file:v.target,sha256:target.sha256},reference:reference?{file:v.reference,sha256:reference.sha256}:null,selection:v.keys??'all source string keys except lang',glossary:v.glossary??null,config,duplicate_policy:'last occurrence used; all message variants retained in diagnostics',full_icu_flutter_validation:false};
   await fs.mkdir(path.dirname(output),{recursive:true});

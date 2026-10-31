@@ -1,0 +1,6 @@
+[
+  {"key":"valid_reward_word","source":"награду","target":"сыйақыны","check":"orthography","expected":"no_issue"},
+  {"key":"valid_reward_sentence","source":"Вы действительно хотите приобрести награду","target":"Сіз шынымен сыйақыны сатып алғыңыз келе ме","check":"wrong_language","expected":"no_issue"},
+  {"key":"valid_discount_sentence","source":"стоимость покупки товара с учетом применённых скидок","target":"Тауардың бағасы қолданылған жеңілдіктермен","check":"wrong_language","expected":"no_issue"},
+  {"key":"uzbek_reward_sentence","source":"Вы действительно хотите приобрести награду","target":"Siz haqiqatan ham mukofotni sotib olmoqchimisiz?","check":"wrong_language","expected":"issue"}
+]

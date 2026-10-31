@@ -12,8 +12,11 @@ import language from './checks/wrong_language.mjs';
 import {analyzeMessage,norm} from './message.mjs';
 import {modelEligible} from './qwen.mjs';
 import {finding} from './shared.mjs';
+import {approvedEntity} from './entities.mjs';
+import {approvedTerms} from './glossary.mjs';
 export const modules=[untranslated,sameAsSource,placeholders,plurals,glossary,length,suffix,inconsistent,semantic,orthography,language];
 export async function checkRecords(records,{config={},terms=[],checks=modules.map(m=>m.id),client=null,onProgress=()=>{},onEvent=()=>{},checkpoint=async()=>{}}={}){
+  terms=approvedTerms(terms);
   config={locale:'kk',allow_unchanged:[],max_chars:{},...config};
   if(config.locale!=='kk')throw Error('Language modules currently support kk only');
   for(const id of checks)if(!modules.some(m=>m.id===id))throw Error(`Unknown check ${id}`);
@@ -22,7 +25,7 @@ export async function checkRecords(records,{config={},terms=[],checks=modules.ma
     const key=norm(r.source);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
   }
   const counters=Object.fromEntries(modules.map(m=>[m.id,{enabled:checks.includes(m.id),assessed:0,findings:0,deferred:0,skipped:0,uncertain:0,failed:0,skip_reasons:{}}]));
-  const report={records:records.length,issues:[],modules:counters,model_reviews:[],diagnostics:[],confidence_note:'No calibrated probabilities available; confidence is null. Model error verdicts and heuristics remain unreviewed candidates.'};
+  const report={records:records.length,issues:[],comparison_groups:[],suppressed_findings:[],modules:counters,model_reviews:[],diagnostics:[],confidence_note:'No calibrated probabilities available; confidence is null. Model error verdicts and heuristics remain unreviewed candidates.'};
   let completed=0;
   onEvent({kind:'progress',completed,total:records.length,modules:counters,findings:0});
   for(const row of records){
@@ -32,12 +35,18 @@ export async function checkRecords(records,{config={},terms=[],checks=modules.ma
     for(const module of modules.filter(m=>checks.includes(m.id))){
       const stat=counters[module.id];
       const skip=reason=>{stat.skipped++;stat.skip_reasons[reason]=(stat.skip_reasons[reason]??0)+1;};
+      if(module.id==='same_as_source'){
+        const exception=approvedEntity(row,config.entity_exceptions??[]);
+        if(exception){skip('human_approved_entity');report.suppressed_findings.push({key:row.key,check:module.id,exception});continue;}
+      }
       if(module.id==='glossary_violation'&&!terms.length){skip('no_glossary');continue;}
       if(!module.model){
         if(module.id!=='untranslated'&&!row.target?.trim()){skip('missing_or_empty');continue;}
         if(['placeholder_mismatch','plural_mismatch'].includes(module.id)&&ctx.src.error){skip('invalid_source_structure');continue;}
         if(module.id==='placeholder_mismatch'&&ctx.tgt.error){skip('invalid_target_structure');continue;}
-        const found=module.run(ctx);stat.assessed++;stat.findings+=found.length;report.issues.push(...found);continue;
+        const found=module.run(ctx);stat.assessed++;
+        if(module.id==='inconsistent_term'){report.comparison_groups.push(...found);stat.comparison_groups=(stat.comparison_groups??0)+found.length;continue;}
+        stat.findings+=found.length;report.issues.push(...found);continue;
       }
       const reason=modelEligible(row,ctx,module);
       if(reason){skip(reason);continue;}
@@ -53,7 +62,7 @@ export async function checkRecords(records,{config={},terms=[],checks=modules.ma
           stat.findings++;
           report.issues.push(finding(ctx,module.id,response.review.reason,{detector:'qwen',source_quote:response.review.source_quote,target_quote:response.review.target_quote,suggestion:response.review.suggestion,suggestion_rejected:response.review.suggestion_rejected}));
         }
-      }catch(e){stat.failed++;report.diagnostics.push({kind:'model_request_failed',check:module.id,key:row.key,error:e.message});}
+      }catch(e){stat.failed++;report.diagnostics.push({kind:'model_request_failed',check:module.id,key:row.key,error:e.message,attempts:e.attempts});}
       await checkpoint(report);
     }
     completed++;

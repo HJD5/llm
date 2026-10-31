@@ -57,9 +57,20 @@ test('actual length constraint is separate from visual overflow hypothesis',asyn
  const r=await run([row('OK','Жалғастыру','button')],{config:{max_chars:{button:5}}});
  assert.equal(r.issues.find(x=>x.issue_type==='length_overflow').status,'constraint');
 });
-test('term variations are only candidates with related keys',async()=>{
+test('term variations are separate comparison groups, not findings',async()=>{
  const r=await run([row('Награда','Марапат','a'),row('Награда','Сыйлық','b')]);const found=r.issues.filter(x=>x.issue_type==='inconsistent_term');
- assert.equal(found.length,2);assert.deepEqual(found[0].related_keys,['a','b']);assert.equal(found[0].status,'candidate');
+ assert.equal(found.length,0);assert.equal(r.comparison_groups.length,1);assert.deepEqual(r.comparison_groups[0].rows.map(x=>x.key),['a','b']);assert.equal(r.modules.inconsistent_term.findings,0);
+});
+test('valid contextual translations of Хорошо are not flagged as errors',async()=>{
+ const a={...row('Хорошо','Жарайды','confirm'),context:{section:'DIALOG',description:'Confirmation button',english:'OK'}};
+ const b={...row('Хорошо','Жақсы','rating'),context:{section:'RATING',description:'Result rating',english:'Good'}};
+ const r=await run([a,b,row('Хорошо','Жарайды','confirmAgain')],{checks:['inconsistent_term']});
+ assert.equal(r.issues.length,0);assert.equal(r.comparison_groups.length,1);assert.equal(r.comparison_groups[0].rows.length,3);assert.equal(r.comparison_groups[0].rows[1].context.english,'Good');
+ const disabled=await run([a,b],{checks:['placeholder_mismatch']});assert.equal(disabled.comparison_groups.length,0);
+ const identical=await run([a,{...b,target:'Жарайды'}],{checks:['inconsistent_term']});assert.equal(identical.comparison_groups.length,0);
+ const glossary=await run([a,b],{checks:['inconsistent_term','glossary_violation'],terms:[{ru:'Хорошо',kk:'Жарайды',key:'confirm'},{ru:'Хорошо',kk:'Жақсы',key:'rating'}]});assert.equal(glossary.issues.length,0);
+ const mismatch=await run([{...a,target:'Бастау'},b],{checks:['inconsistent_term','glossary_violation'],terms:[{ru:'Хорошо',kk:'Жарайды',key:'confirm'}]});assert.equal(mismatch.issues.length,1);assert.equal(mismatch.issues[0].issue_type,'glossary_violation');
+ assert.ok(htmlReport(r).includes('Confirmation button'));assert.ok(htmlReport(r).includes('Сравнить варианты'));
 });
 test('model evidence must quote inputs; malformed suggestions are discarded',()=>{
  const r=row('Привет {name}','Сәлем {name}');

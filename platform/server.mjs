@@ -9,25 +9,24 @@ import {spawn} from 'node:child_process';
 import {parseArb,makeRecords} from '../locqa/src/arb.mjs';
 import {modules} from '../locqa/src/engine.mjs';
 import {htmlReport} from '../locqa/src/report.mjs';
+import {recommend,validateCorrection,exportApproved} from './recommendations.mjs';
+import {entityTypes,entityFingerprint,entityHint} from '../locqa/src/entities.mjs';
+import {readGlossary,approvedTerms} from '../locqa/src/glossary.mjs';
+import {classifyEntity} from './entity-review.mjs';
 const require=createRequire(new URL('../locqa/package.json',import.meta.url));
 const {parse:csv}=require('csv-parse/sync');
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(here);
 export const moduleNames={untranslated:'Отсутствующий перевод',same_as_source:'Совпадение с русским',placeholder_mismatch:'Подстановки',plural_mismatch:'Формы ICU',glossary_violation:'Глоссарий',length_overflow:'Длина текста',suffix_harmony:'Окончания переменных',inconsistent_term:'Единообразие терминов',machine_translation_suspect:'Смысл перевода',orthography:'Орфография',wrong_language:'Язык текста'};
-export function parseGlossary(text){
-  if(!text?.trim())return [];
-  const terms=text.trim().startsWith('[')?JSON.parse(text):csv(text,{columns:true,bom:true,skip_empty_lines:true});
-  if(!Array.isArray(terms)||terms.length>5000)throw Error('Некорректный глоссарий');
-  return terms.map(t=>{
-    if(typeof t.ru!=='string'||!t.ru.trim()||typeof t.kk!=='string'||!t.kk.trim())throw Error('Глоссарий: нужны непустые колонки ru и kk');
-    const variants=Array.isArray(t.variants)?t.variants:typeof t.variants==='string'?t.variants.split('|').filter(Boolean):[];
-    if(variants.some(x=>typeof x!=='string'))throw Error('Некорректные варианты термина');
-    return {...t,variants};
-  });
-}
+export const parseGlossary=readGlossary;
+
 const issueId=i=>createHash('sha256').update(i.key+'\0'+i.issue_type).digest('hex').slice(0,24);
-export async function createPlatform({dataDir=path.join(here,'private-data'),seed=true}={}){
+export async function createPlatform({dataDir=path.join(here,'private-data'),seed=true,recommendationFn=recommend,entityClassifier=classifyEntity}={}){
   await fs.mkdir(path.join(dataDir,'datasets'),{recursive:true});await fs.mkdir(path.join(dataDir,'runs'),{recursive:true});
   const csrf=randomBytes(24).toString('hex'),datasets=new Map(),jobs=new Map(),streams=new Set(),writes=new Map();let active=null,starting=false;
+  let recommending=false;const recommendationController=new AbortController();
+  const exceptionsFile=path.join(dataDir,'entity-exceptions.json');
+  let entityExceptions=[];
+  try{entityExceptions=JSON.parse(await fs.readFile(exceptionsFile,'utf8'));if(!Array.isArray(entityExceptions))throw Error('Invalid entity exceptions');}catch(e){if(e.code!=='ENOENT')throw e;}
   const persist=(file,data)=>{const snapshot=JSON.stringify(data);const write=(writes.get(file)??Promise.resolve()).catch(()=>{}).then(async()=>{const tmp=file+'.tmp';await fs.writeFile(tmp,snapshot);await fs.rename(tmp,file);});writes.set(file,write);return write;};
   function addDataset(id,data){
     if(typeof data.source!=='string'||typeof data.target!=='string')throw Error('Нужны русский и казахский ARB-файлы');
@@ -41,7 +40,9 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
   for(const f of await fs.readdir(path.join(dataDir,'datasets'))){if(!f.endsWith('.json'))continue;try{const d=JSON.parse(await fs.readFile(path.join(dataDir,'datasets',f),'utf8'));addDataset(f.slice(0,-5),d);}catch{}}
   if(seed){try{
     const base=path.join(root,'basw/handout');const [source,target,reference]=await Promise.all(['intl_ru.arb','intl_kk.arb','intl_en.arb'].map(f=>fs.readFile(path.join(base,f),'utf8')));
-    addDataset('grand-mobile',{name:'Grand Mobile · RU → KK',source,target,reference,glossary:[],createdAt:new Date().toISOString()});
+    let glossary=[];
+    try{glossary=readGlossary(await fs.readFile(path.join(root,'locqa/private-results/glossary.csv'),'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
+    addDataset('grand-mobile',{name:'Grand Mobile · RU → KK',source,target,reference,glossary,createdAt:new Date().toISOString()});
   }catch{}}
   for(const f of await fs.readdir(path.join(dataDir,'runs'))){if(!f.endsWith('.json'))continue;try{const j=JSON.parse(await fs.readFile(path.join(dataDir,'runs',f),'utf8'));if(j.status==='running'){j.status='interrupted';j.finishedAt=new Date().toISOString();}jobs.set(j.id,j);}catch{}}
   if(seed&&datasets.has('grand-mobile'))for(const [id,file,name] of [['cli-code','full-code.json','Проверки кодом · сохранённый отчёт'],['cli-semantic','semantic-smoke.json','Qwen · сохранённый тест смысла']]){
@@ -52,9 +53,9 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
   function publish(j){const msg='data: '+JSON.stringify(jobMeta(j))+'\n\n';for(const s of streams)s.write(msg);}
   function log(j,message){j.logs.push({time:new Date().toISOString(),message});j.logs=j.logs.slice(-100);publish(j);}
   const saveJob=j=>persist(path.join(dataDir,'runs',j.id+'.json'),j);
-  const exportReport=j=>({...j.report,run_status:j.status,issues:j.report.issues.map(i=>{const id=issueId(i),review=j.reviews?.[id];return {...i,id,human_review:review??null,reviewed_by_human:!!review&&review.status!=='pending'};})});
+  const exportReport=j=>({...j.report,entity_exceptions:entityExceptions.filter(x=>x.datasetId===j.datasetId).map(x=>({...x,applicable:datasets.get(j.datasetId)?.rows.some(r=>r.key===x.key&&entityFingerprint(r)===x.fingerprint)??false})),corrections:j.corrections??{},run_status:j.status,issues:j.report.issues.map(i=>{const id=issueId(i),review=j.reviews?.[id];return {...i,id,entity_hint:i.issue_type==='same_as_source'?(j.entitySuggestions?.[id]??i.entity_hint??entityHint(i)):null,human_review:review??null,reviewed_by_human:!!review&&review.status!=='pending'};})});
   async function startJob(d,options){
-    if(active||starting)throw Error('Дождитесь завершения текущего запуска или остановите его');
+    if(active||starting||recommending)throw Error('Дождитесь завершения текущего запуска или рекомендации');
     const keys=options.keys??[];
     if(!Array.isArray(options.checks)||!options.checks.length||options.checks.some(x=>!modules.some(m=>m.id===x)))throw Error('Выберите корректные проверки');
     if(!Array.isArray(keys)||keys.some(k=>typeof k!=='string'||!d.rows.some(r=>r.key===k)))throw Error('Неизвестный ключ строки');
@@ -62,7 +63,7 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
     const id=randomUUID(),j={id,datasetId:d.id,name:options.useModel?'Проверка с Qwen':'Проверки кодом',options:{checks:[...new Set(options.checks)],keys,useModel:!!options.useModel,budget:options.budget},status:'running',startedAt:new Date().toISOString(),completed:0,total:keys.length||d.rows.length,logs:[],reviews:{}};
     starting=true;
     jobs.set(id,j);try{await saveJob(j);}catch(e){starting=false;jobs.delete(id);throw e;}log(j,'Запуск проверки · '+j.total+' строк');
-    const worker=new Worker(new URL('./worker.mjs',import.meta.url),{workerData:{dataset:{source:d.source,target:d.target,reference:d.reference,glossary:d.glossary},options:j.options,cacheDir:path.join(root,'locqa/private-results/cache')}});
+    const worker=new Worker(new URL('./worker.mjs',import.meta.url),{workerData:{dataset:{source:d.source,target:d.target,reference:d.reference,glossary:d.glossary,entityExceptions:entityExceptions.filter(x=>x.datasetId===d.id)},options:j.options,cacheDir:path.join(root,'locqa/private-results/cache')}});
     active={id,worker};starting=false;
     worker.on('message',event=>{
       if(j.status!=='running')return;
@@ -96,6 +97,12 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
       }
       if(req.method==='GET'&&parts[0]==='api'&&parts[1]==='runs'&&parts[2]){
         const j=jobs.get(parts[2]);if(!j){json(404,{error:'Запуск не найден'});return;}
+        if(parts[3]==='corrections'){json(200,j.corrections??{});return;}
+        if(parts[3]==='fixed'){
+          const d=datasets.get(j.datasetId);if(!d)throw Error('Набор не найден');
+          const text=exportApproved(d,j.corrections);
+          res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="intl_kk_fixed.arb"','Cache-Control':'no-store'});res.end(text);return;
+        }
         if(parts[3]==='report'||parts[3]==='download'){
           if(!j.report){json(409,{error:'Результатов пока нет'});return;}
           const report=exportReport(j);
@@ -118,6 +125,73 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
         if(url.pathname==='/api/runs'){
           const d=datasets.get(body.datasetId);if(!d){json(404,{error:'Набор не найден'});return;}
           const j=await startJob(d,body);json(201,jobMeta(j));return;
+        }
+        if(url.pathname==='/api/entity-exceptions/revoke'){
+          const item=entityExceptions.find(x=>x.id===body.id);if(!item)throw Error('Исключение не найдено');
+          item.status='revoked';item.revokedAt=new Date().toISOString();await persist(exceptionsFile,entityExceptions);json(200,item);return;
+        }
+        if(parts[0]==='api'&&parts[1]==='runs'&&['entity-classify','entity-exception'].includes(parts[3])){
+          const j=jobs.get(parts[2]),d=datasets.get(j?.datasetId);
+          if(!j?.report||!d||j.status==='running')throw Error('Нужен завершённый отчёт');
+          const issue=j.report.issues.find(i=>issueId(i)===body.issueId&&i.issue_type==='same_as_source');
+          if(!issue)throw Error('Выберите находку совпадения с русским');
+          const row=d.rows.find(r=>r.key===issue.key);
+          if(!row||row.source!==issue.source||row.target!==issue.target||j.report.provenance?.source?.sha256!==d.sourceHash||j.report.provenance?.target?.sha256!==d.targetHash)throw Error('Данные изменились: выполните новую проверку');
+          if(parts[3]==='entity-classify'){
+            if(recommending||active||starting)throw Error('Модель занята');
+            recommending=true;
+            try{const suggestion=await entityClassifier({row,signal:recommendationController.signal});j.entitySuggestions??={};j.entitySuggestions[body.issueId]=suggestion;await saveJob(j);json(200,suggestion);}finally{recommending=false;}
+            return;
+          }
+          if(body.confirm!==true||!entityTypes.slice(0,4).includes(body.type)||typeof body.reviewer!=='string'||!body.reviewer.trim()||body.reviewer.length>100||typeof body.note!=='string'||body.note.length>2000)throw Error('Укажите тип, имя проверяющего и подтвердите написание');
+          const fingerprint=entityFingerprint(row);
+          const previous=entityExceptions.find(x=>x.datasetId===d.id&&x.fingerprint===fingerprint&&x.status==='approved');
+          if(previous){json(200,previous);return;}
+          const item={id:randomUUID(),datasetId:d.id,check:'same_as_source',key:row.key,source:row.source,target:row.target,context:row.context,fingerprint,type:body.type,status:'approved',reviewer:body.reviewer.trim(),note:body.note,approvedAt:new Date().toISOString()};
+          entityExceptions.push(item);await persist(exceptionsFile,entityExceptions);json(201,item);return;
+        }
+        if(parts[0]==='api'&&parts[1]==='runs'&&['recommend','correction-review','correction-edit'].includes(parts[3])){
+          const j=jobs.get(parts[2]),d=datasets.get(j?.datasetId);
+          if(!j?.report||!d)throw Error('Отчёт не найден');
+          if(j.status==='running')throw Error('Дождитесь завершения проверки');
+          const issue=j.report.issues.find(i=>issueId(i)===body.issueId);if(!issue)throw Error('Находка не найдена');
+          const row=d.rows.find(r=>r.key===issue.key);if(!row)throw Error('Строка не найдена');
+          if(j.report.provenance?.target?.sha256!==d.targetHash||j.report.provenance?.source?.sha256!==d.sourceHash)throw Error('Исходные данные изменились: запустите новую проверку');
+          j.corrections??={};
+          if(parts[3]==='correction-edit'){
+            const p=j.corrections[body.issueId];
+            if(!p||body.proposalId!==p.id)throw Error('Предложение изменилось: откройте карточку заново');
+            if(typeof body.reviewer!=='string'||!body.reviewer.trim()||body.reviewer.length>100)throw Error('Укажите имя проверяющего (до 100 символов)');
+            if(typeof body.note!=='string'||body.note.length>2000)throw Error('Комментарий: до 2000 символов');
+            validateCorrection(row,body.translation);
+            const at=new Date().toISOString();
+            const updated={...p,id:randomUUID(),translation:body.translation,status:'pending',reviewer:null,reviewedAt:null,editedBy:body.reviewer.trim(),editedAt:at,note:body.note,history:[...(p.history??[]),{...p,history:undefined}]};
+            j.corrections[body.issueId]=updated;await saveJob(j);json(200,updated);return;
+          }
+          if(parts[3]==='correction-review'){
+            const p=j.corrections[body.issueId];
+            if(!p||!['pending','approved','rejected'].includes(p.status)||!['approved','rejected'].includes(body.status)||body.proposalId!==p.id)throw Error('Нет актуального предложения для подтверждения');
+            if(typeof body.reviewer!=='string'||!body.reviewer.trim()||body.reviewer.length>100)throw Error('Укажите имя проверяющего (до 100 символов)');
+            if(typeof body.note!=='string'||body.note.length>2000)throw Error('Комментарий: до 2000 символов');
+            if(body.status==='approved'){
+              if(body.confirm!==true)throw Error('Нужно явное подтверждение человека');
+              if(body.translation!==p.translation)throw Error('Сначала сохраните отредактированный текст, затем подтвердите его');
+              validateCorrection(row,p.translation);
+              exportApproved(d,{[body.issueId]:{...p,status:'approved'}});
+              if(Object.values(j.corrections).some(x=>x!==p&&x.key===p.key&&x.status==='approved'))throw Error('Для этого ключа уже подтверждено другое исправление');
+            }
+            p.history=[...(p.history??[]),{...p,history:undefined}];p.status=body.status;p.reviewedAt=new Date().toISOString();p.reviewer=body.reviewer.trim();p.note=body.note;await saveJob(j);json(200,p);return;
+          }
+          if(active||starting||recommending)throw Error('Модель занята: дождитесь завершения текущей операции');
+          if(['pending','approved'].includes(j.corrections[body.issueId]?.status))throw Error('Сначала отклоните существующее предложение');
+          recommending=true;
+          try{
+            const value=await recommendationFn({row,issue,glossary:approvedTerms(d.glossary??[]),signal:recommendationController.signal});
+            if(value.translation!==null)validateCorrection(row,value.translation);
+            const p={id:randomUUID(),key:row.key,original:row.target,translation:value.translation,reason:value.reason,status:value.translation===null?'no_suggestion':'pending',createdAt:new Date().toISOString(),sourceHash:d.sourceHash,targetHash:d.targetHash};
+            const previous=j.corrections[body.issueId];if(previous)p.history=[...(previous.history??[]),{...previous,history:undefined}];j.corrections[body.issueId]=p;await saveJob(j);json(200,p);
+          }finally{recommending=false;}
+          return;
         }
         if(url.pathname==='/api/model/start'){
           if((await modelStatus()).status==='ready'){json(200,{status:'ready'});return;}
@@ -143,7 +217,7 @@ export async function createPlatform({dataDir=path.join(here,'private-data'),see
       json(404,{error:'Не найдено'});
     }catch(e){if(!res.headersSent)json(400,{error:e.message});else res.end();}
   });
-  async function close(){if(active){const j=jobs.get(active.id);j.status='interrupted';j.finishedAt=new Date().toISOString();await active.worker.terminate();await saveJob(j);active=null;}for(const s of streams)s.end();await Promise.allSettled([...writes.values()]);await new Promise(r=>server.close(r));}
+  async function close(){recommendationController.abort();if(active){const j=jobs.get(active.id);j.status='interrupted';j.finishedAt=new Date().toISOString();await active.worker.terminate();await saveJob(j);active=null;}for(const s of streams)s.end();await Promise.allSettled([...writes.values()]);await new Promise(r=>server.close(r));}
   return {server,close};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
